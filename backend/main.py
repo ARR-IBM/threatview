@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI
+from fastapi import FastAPI
 import httpx
 import os
 
@@ -27,8 +27,8 @@ async def lookup_ioc(ioc: str):
                 headers={"x-apikey": VT_API}
             )
             results["virustotal"] = vt.json()
-        except:
-            results["virustotal"] = "error"
+        except Exception as e:
+            results["virustotal"] = str(e)
 
         try:
             abuse = await client.get(
@@ -37,8 +37,8 @@ async def lookup_ioc(ioc: str):
                 params={"ipAddress": ioc}
             )
             results["abuseipdb"] = abuse.json()
-        except:
-            results["abuseipdb"] = "error"
+        except Exception as e:
+            results["abuseipdb"] = str(e)
 
         try:
             otx = await client.get(
@@ -46,8 +46,8 @@ async def lookup_ioc(ioc: str):
                 headers={"X-OTX-API-KEY": OTX_API}
             )
             results["otx"] = otx.json()
-        except:
-            results["otx"] = "error"
+        except Exception as e:
+            results["otx"] = str(e)
 
         try:
             gn = await client.get(
@@ -55,8 +55,8 @@ async def lookup_ioc(ioc: str):
                 headers={"key": GREYNOISE_API}
             )
             results["greynoise"] = gn.json()
-        except:
-            results["greynoise"] = "error"
+        except Exception as e:
+            results["greynoise"] = str(e)
 
         try:
             shodan = await client.get(
@@ -64,7 +64,7 @@ async def lookup_ioc(ioc: str):
                 params={"key": SHODAN_API}
             )
             results["shodan"] = shodan.json()
-        except:
-            results["shodan"] = "error"
+        except Exception as e:
+            results["shodan"] = str(e)
 
     return results
