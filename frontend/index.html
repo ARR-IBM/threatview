@@ -1,8 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>ThreatView SOC Console</title>
+<title>ThreatView SOC Dashboard</title>
 <meta charset="UTF-8">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
 
 body {
@@ -12,31 +15,36 @@ body {
 }
 
 .container {
-    width: 90%;
+    width: 95%;
     margin: auto;
-    margin-top: 30px;
-}
-
-input {
-    width: 60%;
-    padding: 12px;
-    background: #121a33;
-    border: 1px solid #30363d;
-    color: white;
-}
-
-button {
-    padding: 12px;
-    background: #238636;
-    color: white;
-    border: none;
-    cursor: pointer;
 }
 
 .card {
     background: #121a33;
-    padding: 15px;
+    padding: 20px;
     margin-top: 20px;
+}
+
+input, button {
+    padding: 10px;
+    font-size: 16px;
+}
+
+button {
+    background: #238636;
+    color: white;
+    border: none;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.metric {
+    background: #161b22;
+    padding: 15px;
 }
 
 </style>
@@ -46,31 +54,108 @@ button {
 
 <div class="container">
 
-<h1>ThreatView SOC Console</h1>
+<h1>ThreatView SOC Dashboard</h1>
 
-<input id="ioc" placeholder="Enter IP, Domain, URL, or Hash">
+<input id="ioc" placeholder="Enter IOC">
 <button onclick="lookup()">Analyze</button>
 
-<div id="result"></div>
+<div class="grid">
+
+<div class="metric">
+Total
+<div id="total">0</div>
+</div>
+
+<div class="metric">
+Malicious
+<div id="malicious">0</div>
+</div>
+
+<div class="metric">
+Suspicious
+<div id="suspicious">0</div>
+</div>
+
+<div class="metric">
+Clean
+<div id="clean">0</div>
+</div>
+
+</div>
+
+<div class="card">
+<canvas id="chart"></canvas>
+</div>
+
+<div class="card">
+<pre id="raw"></pre>
+</div>
 
 </div>
 
 <script>
 
+let chart;
+
 async function lookup() {
 
     const ioc = document.getElementById("ioc").value;
 
-    const response = await fetch(
+    const res = await fetch(
         "https://threatview.onrender.com/lookup/" + ioc
     );
 
-    const data = await response.json();
+    const data = await res.json();
 
-    document.getElementById("result").innerHTML =
-        "<div class='card'><pre>" +
-        JSON.stringify(data, null, 2) +
-        "</pre></div>";
+    document.getElementById("raw").textContent =
+        JSON.stringify(data, null, 2);
+
+    processChart(data);
+}
+
+function processChart(data) {
+
+    let malicious = 0;
+    let clean = 0;
+
+    if(data.virustotal?.data?.attributes?.last_analysis_stats) {
+
+        const stats =
+        data.virustotal.data.attributes.last_analysis_stats;
+
+        malicious = stats.malicious;
+        clean = stats.harmless;
+    }
+
+    document.getElementById("total").innerText =
+        malicious + clean;
+
+    document.getElementById("malicious").innerText =
+        malicious;
+
+    document.getElementById("clean").innerText =
+        clean;
+
+    drawChart(malicious, clean);
+}
+
+function drawChart(malicious, clean) {
+
+    if(chart) chart.destroy();
+
+    chart = new Chart(
+        document.getElementById("chart"),
+        {
+            type: "pie",
+
+            data: {
+                labels: ["Malicious", "Clean"],
+                datasets: [{
+                    data: [malicious, clean]
+                }]
+            }
+        }
+    );
 }
 
 </script>
