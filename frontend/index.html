@@ -3,50 +3,35 @@
 <head>
 <title>ThreatView SOC Dashboard</title>
 <meta charset="UTF-8">
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-
 body {
-    background-color: #0b1020;
-    color: #e6edf3;
+    background: #0b1020;
+    color: white;
     font-family: Arial;
 }
-
 .container {
     width: 95%;
     margin: auto;
 }
-
-.card {
-    background: #121a33;
-    padding: 20px;
-    margin-top: 20px;
-}
-
-input, button {
-    padding: 10px;
-    font-size: 16px;
-}
-
-button {
-    background: #238636;
-    color: white;
-    border: none;
-}
-
 .grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4,1fr);
     gap: 10px;
 }
-
-.metric {
+.card {
     background: #161b22;
     padding: 15px;
 }
-
+input,button {
+    padding: 10px;
+}
+button {
+    background: green;
+    color: white;
+    border: none;
+}
 </style>
 </head>
 
@@ -56,31 +41,14 @@ button {
 
 <h1>ThreatView SOC Dashboard</h1>
 
-<input id="ioc" placeholder="Enter IOC">
+<input id="ioc">
 <button onclick="lookup()">Analyze</button>
 
 <div class="grid">
-
-<div class="metric">
-Total
-<div id="total">0</div>
-</div>
-
-<div class="metric">
-Malicious
-<div id="malicious">0</div>
-</div>
-
-<div class="metric">
-Suspicious
-<div id="suspicious">0</div>
-</div>
-
-<div class="metric">
-Clean
-<div id="clean">0</div>
-</div>
-
+<div class="card">Total<div id="total">0</div></div>
+<div class="card">Malicious<div id="malicious">0</div></div>
+<div class="card">Suspicious<div id="suspicious">0</div></div>
+<div class="card">Clean<div id="clean">0</div></div>
 </div>
 
 <div class="card">
@@ -88,7 +56,7 @@ Clean
 </div>
 
 <div class="card">
-<pre id="raw"></pre>
+<pre id="output"></pre>
 </div>
 
 </div>
@@ -99,63 +67,61 @@ let chart;
 
 async function lookup() {
 
-    const ioc = document.getElementById("ioc").value;
+const ioc = document.getElementById("ioc").value;
 
-    const res = await fetch(
-        "https://threatview.onrender.com/lookup/" + ioc
-    );
+const res = await fetch(
+"https://threatview.onrender.com/lookup/" + ioc
+);
 
-    const data = await res.json();
+const data = await res.json();
 
-    document.getElementById("raw").textContent =
-        JSON.stringify(data, null, 2);
+document.getElementById("output").textContent =
+JSON.stringify(data,null,2);
 
-    processChart(data);
+let malicious=0;
+let suspicious=0;
+let clean=0;
+
+try {
+
+malicious =
+data.virustotal.data.attributes.last_analysis_stats.malicious;
+
+suspicious =
+data.virustotal.data.attributes.last_analysis_stats.suspicious;
+
+clean =
+data.virustotal.data.attributes.last_analysis_stats.harmless;
+
+}
+catch {}
+
+document.getElementById("malicious").innerText = malicious;
+document.getElementById("suspicious").innerText = suspicious;
+document.getElementById("clean").innerText = clean;
+document.getElementById("total").innerText =
+malicious+suspicious+clean;
+
+drawChart(malicious,suspicious,clean);
+
 }
 
-function processChart(data) {
+function drawChart(m,s,c){
 
-    let malicious = 0;
-    let clean = 0;
+if(chart) chart.destroy();
 
-    if(data.virustotal?.data?.attributes?.last_analysis_stats) {
-
-        const stats =
-        data.virustotal.data.attributes.last_analysis_stats;
-
-        malicious = stats.malicious;
-        clean = stats.harmless;
-    }
-
-    document.getElementById("total").innerText =
-        malicious + clean;
-
-    document.getElementById("malicious").innerText =
-        malicious;
-
-    document.getElementById("clean").innerText =
-        clean;
-
-    drawChart(malicious, clean);
+chart=new Chart(
+document.getElementById("chart"),
+{
+type:"pie",
+data:{
+labels:["Malicious","Suspicious","Clean"],
+datasets:[{
+data:[m,s,c]
+}]
 }
+});
 
-function drawChart(malicious, clean) {
-
-    if(chart) chart.destroy();
-
-    chart = new Chart(
-        document.getElementById("chart"),
-        {
-            type: "pie",
-
-            data: {
-                labels: ["Malicious", "Clean"],
-                datasets: [{
-                    data: [malicious, clean]
-                }]
-            }
-        }
-    );
 }
 
 </script>
