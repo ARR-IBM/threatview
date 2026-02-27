@@ -1,20 +1,61 @@
 from fastapi import FastAPI
 import httpx
 import os
+from dotenv import load_dotenv
+
+# Load .env file
+load_dotenv()
 
 app = FastAPI(title="ThreatView SOC Console")
 
 VT_API = os.getenv("VT_API")
 ABUSE_API = os.getenv("ABUSE_API")
 OTX_API = os.getenv("OTX_API")
-GREYNOISE_API = os.getenv("GREYNOISE_API")
 SHODAN_API = os.getenv("SHODAN_API")
-
 
 @app.get("/")
 def root():
     return {"status": "ThreatView Backend Running"}
 
+def calculate_threat_score(results):
+
+    score = 0
+    reasons = []
+
+    try:
+        vt = results.get("virustotal", {})
+        malicious = vt.get("data", {}).get("attributes", {}).get("last_analysis_stats", {}).get("malicious", 0)
+
+        if malicious > 0:
+            score += malicious * 2
+            reasons.append(f"VirusTotal detections: {malicious}")
+
+    except:
+        pass
+
+    try:
+        abuse = results.get("abuseipdb", {})
+        abuse_score = abuse.get("data", {}).get("abuseConfidenceScore", 0)
+
+        if abuse_score > 0:
+            score += abuse_score / 10
+            reasons.append(f"AbuseIPDB score: {abuse_score}")
+
+    except:
+        pass
+
+    verdict = "CLEAN"
+
+    if score >= 15:
+        verdict = "MALICIOUS"
+    elif score >= 5:
+        verdict = "SUSPICIOUS"
+
+    return {
+        "score": round(score, 2),
+        "verdict": verdict,
+        "reasons": reasons
+    }
 
 @app.get("/lookup/{ioc}")
 async def lookup_ioc(ioc: str):
@@ -23,7 +64,6 @@ async def lookup_ioc(ioc: str):
 
     async with httpx.AsyncClient(timeout=30) as client:
 
-        # VirusTotal
         if VT_API:
             try:
                 vt = await client.get(
@@ -32,11 +72,10 @@ async def lookup_ioc(ioc: str):
                 )
                 results["virustotal"] = vt.json()
             except Exception as e:
-                results["virustotal"] = str(e)
+                results["virustotal"] = {"error": str(e)}
         else:
-            results["virustotal"] = "API key not configured"
+            results["virustotal"] = {"status": "API key not configured"}
 
-        # AbuseIPDB
         if ABUSE_API:
             try:
                 abuse = await client.get(
@@ -46,11 +85,10 @@ async def lookup_ioc(ioc: str):
                 )
                 results["abuseipdb"] = abuse.json()
             except Exception as e:
-                results["abuseipdb"] = str(e)
+                results["abuseipdb"] = {"error": str(e)}
         else:
-            results["abuseipdb"] = "API key not configured"
+            results["abuseipdb"] = {"status": "API key not configured"}
 
-        # AlienVault OTX
         if OTX_API:
             try:
                 otx = await client.get(
@@ -59,24 +97,10 @@ async def lookup_ioc(ioc: str):
                 )
                 results["otx"] = otx.json()
             except Exception as e:
-                results["otx"] = str(e)
+                results["otx"] = {"error": str(e)}
         else:
-            results["otx"] = "API key not configured"
+            results["otx"] = {"status": "API key not configured"}
 
-        # GreyNoise (optional)
-        if GREYNOISE_API:
-            try:
-                gn = await client.get(
-                    f"https://api.greynoise.io/v3/community/{ioc}",
-                    headers={"key": GREYNOISE_API}
-                )
-                results["greynoise"] = gn.json()
-            except Exception as e:
-                results["greynoise"] = str(e)
-        else:
-            results["greynoise"] = "Not configured"
-
-        # Shodan
         if SHODAN_API:
             try:
                 shodan = await client.get(
@@ -85,8 +109,14 @@ async def lookup_ioc(ioc: str):
                 )
                 results["shodan"] = shodan.json()
             except Exception as e:
-                results["shodan"] = str(e)
+                results["shodan"] = {"error": str(e)}
         else:
-            results["shodan"] = "API key not configured"
+            results["shodan"] = {"status": "API key not configured"}
 
-    return results
+    threat_score = calculate_threat_score(results)
+
+    return {
+        "ioc": ioc,
+        "threat_score": threat_score,
+        "enrichment": results
+    }
